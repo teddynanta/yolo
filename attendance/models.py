@@ -20,4 +20,4 @@ class Attendance(models.Model):
   type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='clock_in')
 
   def __str__(self):
-    return f"{self.user.name} - {self.date} - {self.type} - {self.status}"
+    return f"{self.user.username} - {self.date} - {self.type} - {self.status}"
