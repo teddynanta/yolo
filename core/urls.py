@@ -29,4 +29,6 @@ urlpatterns = [
     path('leader-dashboard/', views.leader_dashboard, name='leader_dashboard'),
     path('user-dashboard/', views.user_dashboard, name='user_dashboard'),
     path('redirect-by-role/', views.redirect_by_role, name='redirect_by_role'),
+    path('', include('attendance.urls')),
+
 ]

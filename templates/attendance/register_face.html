@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Register Your Face</h2>
+
+<video id="video" width="400" autoplay></video>
+<br>
+<button id="snap">Capture Face</button>
+<canvas id="canvas" width="400" height="300" style="display:none;"></canvas>
+<br><br>
+<form method="POST" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="image_data" id="image_data">
+  <button type="submit">Save Face Data</button>
+</form>
+
+<script>
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const snap = document.getElementById('snap');
+  const image_data_input = document.getElementById('image_data');
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      video.srcObject = stream;
+    });
+
+  snap.addEventListener('click', () => {
+    const context = canvas.getContext('2d');
+    canvas.style.display = 'block';
+    context.drawImage(video, 0, 0, 400, 300);
+    const dataURL = canvas.toDataURL('image/jpeg');
+    image_data_input.value = dataURL;
+  });
+</script>
+
+{% endblock %}
