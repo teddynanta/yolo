@@ -12,6 +12,8 @@ from users.models import UserProfile
 import face_recognition
 import pickle
 from PIL import Image
+from django.core.files.base import ContentFile
+import base64, uuid
 
 
 @login_required
@@ -61,7 +63,9 @@ def register_face(request):
         # Save to user profile
         try:
             profile = request.user.userprofile
+            img_file = ContentFile(img_data, name=f'{request.user.username}_face.jpg')
             profile.face_encoding = pickle.dumps(face_encoding)
+            profile.face_image = img_file
             profile.save()
         except Exception as e:
             return HttpResponse(f"Failed to save encoding: {str(e)}", status=500)
@@ -97,20 +101,27 @@ def submit_attendance(request):
 def submit_attendance_image(request):
     if request.method == 'POST':
         data_url = request.POST.get('image_data')
+        attend_type = request.POST.get('type')  # 🧠 Must be 'in' or 'out'
 
-        if not data_url:
-            return HttpResponse("No image data", status=400)
+        if not data_url or not attend_type:
+            return HttpResponse("Missing image or type", status=400)
 
-        # Decode base64 image
         format, imgstr = data_url.split(';base64,') 
         img_data = base64.b64decode(imgstr)
         np_img = np.frombuffer(img_data, np.uint8)
         frame = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 
-        # Save image for debug
-        cv2.imwrite("debug.jpg", frame)
+        # Save image
+        img_filename = f"{request.user.username}_{uuid.uuid4().hex}.jpg"
+        img_file = ContentFile(img_data, name=img_filename)
 
-        # Later: run face recognition here...
+        # Save attendance
+        Attendance.objects.create(
+            user=request.user,
+            type=attend_type,
+            captured_image=img_file
+        )
 
-        return HttpResponse("Image received and saved!")
+        return HttpResponse("Attendance submitted with image!")
+
     return HttpResponse("Only POST allowed", status=405)

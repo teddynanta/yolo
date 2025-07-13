@@ -8,10 +8,21 @@
 <button id="snap">Take Photo</button>
 <canvas id="canvas" width="400" height="300" style="display:none;"></canvas>
 <br><br>
-<form id="photoForm" method="POST" enctype="multipart/form-data" action="{% url 'submit_attendance_image' %}">
 
+<form id="photoForm" method="POST" enctype="multipart/form-data" action="{% url 'submit_attendance_image' %}">
   {% csrf_token %}
+
+  <!-- Select Clock In or Clock Out -->
+  <label for="type">Type:</label>
+  <select name="type" id="type">
+    <option value="in">Clock In</option>
+    <option value="out">Clock Out</option>
+  </select>
+  <br><br>
+
+  <!-- Hidden Image Data -->
   <input type="hidden" name="image_data" id="image_data">
+
   <button type="submit">Submit Attendance</button>
 </form>
 
