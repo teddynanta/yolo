@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from .models import Attendance
 from django.contrib.auth.models import User
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from users.models import UserProfile
 import face_recognition
 import pickle
@@ -15,6 +15,17 @@ from PIL import Image
 from django.core.files.base import ContentFile
 import base64, uuid
 
+
+@login_required
+def my_attendance(request):
+    records = Attendance.objects.filter(user=request.user).order_by('-timestamp')
+    return render(request, 'attendance/my_attendance.html', {'records': records})
+
+
+@user_passes_test(lambda u: u.userprofile.role.name == 'Leader' or u.is_superuser)
+def all_attendance(request):
+    records = Attendance.objects.select_related('user').order_by('-timestamp')
+    return render(request, 'attendance/all_attendance.html', {'records': records})
 
 @login_required
 def register_face(request):
@@ -106,22 +117,40 @@ def submit_attendance_image(request):
         if not data_url or not attend_type:
             return HttpResponse("Missing image or type", status=400)
 
-        format, imgstr = data_url.split(';base64,') 
+        format, imgstr = data_url.split(';base64,')
         img_data = base64.b64decode(imgstr)
         np_img = np.frombuffer(img_data, np.uint8)
         frame = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Save image
-        img_filename = f"{request.user.username}_{uuid.uuid4().hex}.jpg"
-        img_file = ContentFile(img_data, name=img_filename)
+        face_locations = face_recognition.face_locations(rgb_frame)
+        if not face_locations:
+            return HttpResponse("No face detected", status=400)
 
-        # Save attendance
-        Attendance.objects.create(
-            user=request.user,
-            type=attend_type,
-            captured_image=img_file
-        )
+        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+        unknown_encoding = face_encodings[0]
 
-        return HttpResponse("Attendance submitted with image!")
+        # Loop through known users
+        from users.models import UserProfile
+        known_users = UserProfile.objects.exclude(face_encoding__isnull=True)
+
+        for profile in known_users:
+            known_encoding = pickle.loads(profile.face_encoding)
+            results = face_recognition.compare_faces([known_encoding], unknown_encoding, tolerance=0.5)
+
+            if results[0]:  # Match found
+                img_filename = f"{profile.user.username}_{uuid.uuid4().hex}.jpg"
+                img_file = ContentFile(img_data, name=img_filename)
+                attendance = Attendance(
+                    user=profile.user,
+                    type=attend_type,  # Or determine this from form input
+                    timestamp=timezone.now()
+                )
+                attendance.captured_image.save(img_filename, img_file)
+                attendance.save()
+                # Save image
+                return HttpResponse(f"{profile.user.username} clocked {attend_type} successfully!")
+
+        return HttpResponse("Face not recognized", status=404)
 
     return HttpResponse("Only POST allowed", status=405)

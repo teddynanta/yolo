@@ -1,6 +1,37 @@
 {% extends "base.html" %}
-
 {% block content %}
-  <h1>Welcome, {{ request.user.username }}!</h1>
-  <p>This is the Admin Dashboard.</p>
+<h2>Admin Dashboard - User Face Management</h2>
+<a href="{% url 'all_attendance' %}">All Attendance</a>
+<table border="1" cellpadding="6">
+  <tr>
+    <th>Username</th>
+    <th>Role</th>
+    <th>Has Face Data</th>
+    <th>Actions</th>
+  </tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.username }}</td>
+    <td>{{ u.userprofile.role.name }}</td>
+    <td>{{ u.userprofile.face_encoding|yesno:"✅,❌" }}</td>
+    <td>
+      <a href="{% url 'admin_register_face' u.id %}">Register Face</a> |
+      <!-- Later: Add remove button here -->
+    </td>
+    <td>
+      {% if u.userprofile.face_encoding %}
+        <a href="{% url 'admin_register_face' u.id %}">🔁 Update</a> |
+        <a href="{% url 'delete_face' u.id %}" onclick="return confirm('Delete face data for {{ u.username }}?')">❌ Delete</a>
+      {% else %}
+        <a href="{% url 'admin_register_face' u.id %}">📷 Register</a>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<form method="post" action="{% url 'logout' %}">
+  {% csrf_token %}
+  <button type="submit">Logout</button>
+</form>
+
 {% endblock %}

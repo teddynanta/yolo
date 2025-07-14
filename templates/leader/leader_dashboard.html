@@ -3,4 +3,33 @@
 {% block content %}
   <h2>Leader Dashboard</h2>
   <p>Hello {{ request.user.username }}! This is the leader's dashboard.</p>
+  <h2>All Users' Attendance</h2>
+
+  <table border="1">
+    <tr>
+      <th>User</th>
+      <th>Type</th>
+      <th>Timestamp</th>
+      <th>Proof</th>
+    </tr>
+    {% for record in records %}
+    <tr>
+      <td>{{ record.user.username }}</td>
+      <td>{{ record.type }}</td>
+      <td>{{ record.timestamp }}</td>
+      <td>
+        {% if record.captured_image %}
+          <img src="{{ record.captured_image.url }}" width="100">
+          {% else %}
+          ❌
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit">Logout</button>
+  </form>
+
 {% endblock %}

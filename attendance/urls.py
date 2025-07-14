@@ -6,6 +6,8 @@ urlpatterns = [
     path('submit/', views.submit_attendance, name='submit_attendance'),
     path('submit-image/', views.submit_attendance_image, name='submit_attendance_image'),
     path('register-face/', views.register_face, name='register_face'),
+    path('my-attendance/', views.my_attendance, name='my_attendance'),
+    path('all-attendance/', views.all_attendance, name='all_attendance'),
 
 
 

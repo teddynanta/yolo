@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h2>All Users' Attendance</h2>
+
+<table border="1">
+  <tr>
+    <th>User</th>
+    <th>Type</th>
+    <th>Timestamp</th>
+    <th>Proof</th>
+  </tr>
+  {% for record in records %}
+  <tr>
+    <td>{{ record.user.username }}</td>
+    <td>{{ record.type }}</td>
+    <td>{{ record.timestamp }}</td>
+    <td>
+      {% if record.captured_image %}
+        <img src="{{ record.captured_image.url }}" width="100">
+        {% else %}
+        ❌
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

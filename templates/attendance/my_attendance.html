@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>My Attendance</h2>
+
+<table border="1">
+  <tr>
+    <th>Type</th>
+    <th>Timestamp</th>
+    <th>Proof</th>
+  </tr>
+  {% for record in records %}
+  <tr>
+    <td>{{ record.type }}</td>
+    <td>{{ record.timestamp }}</td>
+    <td>
+      {% if record.image %}
+        <img src="{{ record.image.url }}" width="100">
+      {% else %}
+        ❌
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
