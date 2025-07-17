@@ -14,7 +14,62 @@ import pickle
 from PIL import Image
 from django.core.files.base import ContentFile
 import base64, uuid
+from ultralytics import YOLO  # 🧠 pip install ultralytics
+from django.conf import settings
+from django.http import JsonResponse
+from io import BytesIO
+from .utils import detect_faces_yolo_image
 
+# Load YOLO model (cached after first load)
+model = YOLO(settings.BASE_DIR / "best.pt")
+
+@csrf_exempt
+def detect_faces_yolo(request):
+    if request.method == "POST":
+        image_data = request.POST.get("image_data")
+        if not image_data:
+            return JsonResponse({"status": "error", "message": "No image data provided"})
+
+        try:
+            # Remove the base64 header (data:image/jpeg;base64,...)
+            format, imgstr = image_data.split(';base64,') 
+            image_bytes = base64.b64decode(imgstr)
+            np_arr = np.frombuffer(image_bytes, np.uint8)
+            image_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+            # Run YOLO prediction
+            results = model.predict(image_bgr, conf=0.25, imgsz=640, verbose=False)[0]
+            print("Received image for face detection")
+
+            # After decoding image
+            print("Decoded image shape:", image_bgr.shape)
+
+            # After model prediction
+            print("YOLOv8 result:", results)
+            print("Boxes:", results.boxes)
+            print("Box count:", len(results.boxes))
+
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                cv2.rectangle(image_bgr, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            cv2.imwrite("media/debug.jpg", image_bgr)
+            # Check for detections
+            if len(results.boxes) > 0:
+                box = results.boxes[0].xyxy[0].cpu().numpy().astype(int)
+                x1, y1, x2, y2 = box
+                width = x2 - x1
+                height = y2 - y1
+
+                return JsonResponse({
+                    "status": "face_detected",
+                    "face_box": [int(x1), int(y1), int(width), int(height)]
+                })
+            else:
+                return JsonResponse({"status": "no_face"})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)})
+    return JsonResponse({"status": "error", "message": "Invalid request"})
 
 @login_required
 def my_attendance(request):
@@ -63,7 +118,7 @@ def register_face(request):
             print("Final dtype:", rgb_array.dtype)
             print("Final shape:", rgb_array.shape)
             print("Final type:", type(rgb_array))
-            face_locations = face_recognition.face_locations(rgb_array)
+            face_locations = detect_faces_yolo(rgb_array)
             if not face_locations:
                 return HttpResponse("No face detected", status=400)
 
@@ -109,48 +164,76 @@ def submit_attendance(request):
     return HttpResponse("Invalid request", status=400)
 
 @csrf_exempt
+# def submit_attendance_image(request):
+#     if request.method == 'POST':
+#         data_url = request.POST.get('image_data')
+#         attend_type = request.POST.get('type')  # 🧠 Must be 'in' or 'out'
+
+#         if not data_url or not attend_type:
+#             return HttpResponse("Missing image or type", status=400)
+
+#         format, imgstr = data_url.split(';base64,')
+#         img_data = base64.b64decode(imgstr)
+#         np_img = np.frombuffer(img_data, np.uint8)
+#         frame = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+#         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+#         face_locations = detect_faces_yolo(rgb_frame)
+#         if not face_locations:
+#             return HttpResponse("No face detected", status=400)
+
+#         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+#         unknown_encoding = face_encodings[0]
+
+#         # Loop through known users
+#         from users.models import UserProfile
+#         known_users = UserProfile.objects.exclude(face_encoding__isnull=True)
+
+#         for profile in known_users:
+#             known_encoding = pickle.loads(profile.face_encoding)
+#             results = face_recognition.compare_faces([known_encoding], unknown_encoding, tolerance=0.5)
+
+#             if results[0]:  # Match found
+#                 img_filename = f"{profile.user.username}_{uuid.uuid4().hex}.jpg"
+#                 img_file = ContentFile(img_data, name=img_filename)
+#                 attendance = Attendance(
+#                     user=profile.user,
+#                     type=attend_type,  # Or determine this from form input
+#                     timestamp=timezone.now()
+#                 )
+#                 attendance.captured_image.save(img_filename, img_file)
+#                 attendance.save()
+#                 # Save image
+#                 return HttpResponse(f"{profile.user.username} clocked {attend_type} successfully!")
+
+#         return HttpResponse("Face not recognized", status=404)
+
+#     return HttpResponse("Only POST allowed", status=405)
+
 def submit_attendance_image(request):
-    if request.method == 'POST':
-        data_url = request.POST.get('image_data')
-        attend_type = request.POST.get('type')  # 🧠 Must be 'in' or 'out'
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            image_data = data.get("image")
 
-        if not data_url or not attend_type:
-            return HttpResponse("Missing image or type", status=400)
+            if not image_data:
+                return JsonResponse({"success": False, "error": "No image data provided."})
 
-        format, imgstr = data_url.split(';base64,')
-        img_data = base64.b64decode(imgstr)
-        np_img = np.frombuffer(img_data, np.uint8)
-        frame = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            format, imgstr = image_data.split(';base64,')
+            image_bytes = base64.b64decode(imgstr)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        face_locations = face_recognition.face_locations(rgb_frame)
-        if not face_locations:
-            return HttpResponse("No face detected", status=400)
+            # 👇 Use helper, not view!
+            face_locations = detect_faces_yolo_image(rgb_frame)
 
-        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-        unknown_encoding = face_encodings[0]
+            if len(face_locations) == 0:
+                return JsonResponse({"success": False, "error": "Face not detected."})
 
-        # Loop through known users
-        from users.models import UserProfile
-        known_users = UserProfile.objects.exclude(face_encoding__isnull=True)
+            # ... rest of the recognition and attendance logic ...
+            
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)})
 
-        for profile in known_users:
-            known_encoding = pickle.loads(profile.face_encoding)
-            results = face_recognition.compare_faces([known_encoding], unknown_encoding, tolerance=0.5)
-
-            if results[0]:  # Match found
-                img_filename = f"{profile.user.username}_{uuid.uuid4().hex}.jpg"
-                img_file = ContentFile(img_data, name=img_filename)
-                attendance = Attendance(
-                    user=profile.user,
-                    type=attend_type,  # Or determine this from form input
-                    timestamp=timezone.now()
-                )
-                attendance.captured_image.save(img_filename, img_file)
-                attendance.save()
-                # Save image
-                return HttpResponse(f"{profile.user.username} clocked {attend_type} successfully!")
-
-        return HttpResponse("Face not recognized", status=404)
-
-    return HttpResponse("Only POST allowed", status=405)
+    return JsonResponse({"success": False, "error": "Invalid request method."})

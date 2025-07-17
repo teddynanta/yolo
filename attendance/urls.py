@@ -8,6 +8,7 @@ urlpatterns = [
     path('register-face/', views.register_face, name='register_face'),
     path('my-attendance/', views.my_attendance, name='my_attendance'),
     path('all-attendance/', views.all_attendance, name='all_attendance'),
+    path("detect-face-yolo/", views.detect_faces_yolo, name="detect_face_yolo"),
 
 
 
